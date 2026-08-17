@@ -99,7 +99,7 @@ frontend_dir = get_frontend_dir()
 index_file_path = os.path.join(frontend_dir, "index.html")
 frontend_src_path = os.path.join(frontend_dir, "src")
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def serve_index():
     if os.path.exists(index_file_path):
         return FileResponse(index_file_path)
