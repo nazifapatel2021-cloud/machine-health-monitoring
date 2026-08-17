@@ -64,19 +64,20 @@ window.ApiService = {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      window.ApiService.isUsingFallback = false;
       return data;
     } catch (err) {
-      console.warn(`[Backend Offline Fallback]: Using client simulation engine: ${err.message}`);
-      window.ApiService.isUsingFallback = true;
-      window.ApiService.isLiveData = false;
+      console.warn(`[Backend Offline Fallback]: Using client simulation engine for ${url}: ${err.message}`);
       return null;
     }
   },
 
   async getMachines() {
     const data = await this.fetchWithFallback(`${API_BASE}/machines`);
-    if (data) return data;
+    if (data) {
+      window.ApiService.isUsingFallback = false;
+      return data;
+    }
+    window.ApiService.isUsingFallback = true;
     return fallbackState.machines;
   },
 
@@ -99,8 +100,10 @@ window.ApiService = {
     const data = await this.fetchWithFallback(`${API_BASE}/sensors/${machineId}`);
     if (data) {
       window.ApiService.isLiveData = !!data.is_live;
+      window.ApiService.isUsingFallback = false;
       return data;
     }
+    window.ApiService.isUsingFallback = true;
     const m = fallbackState.machines.find(x => x.id === machineId) || fallbackState.machines[0];
     return {
       machine_id: machineId,
