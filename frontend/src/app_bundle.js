@@ -283,7 +283,8 @@ const Header = ({
   onSelectMachine, 
   onInjectAnomaly, 
   onClearAnomalies,
-  isLiveData 
+  isLiveData,
+  isUsingFallback
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-xl">
@@ -321,13 +322,21 @@ const Header = ({
         <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border text-xs font-mono font-bold shadow-sm ${
           isLiveData 
             ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60'
+            : isUsingFallback
+            ? 'bg-orange-950/80 text-orange-300 border-orange-500/60'
             : 'bg-amber-950/80 text-amber-300 border-amber-500/60'
         }`}>
           <span className="relative flex h-2.5 w-2.5">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLiveData ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLiveData ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+              isLiveData ? 'bg-emerald-400' : isUsingFallback ? 'bg-orange-400' : 'bg-amber-400'
+            }`}></span>
+            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+              isLiveData ? 'bg-emerald-500' : isUsingFallback ? 'bg-orange-500' : 'bg-amber-500'
+            }`}></span>
           </span>
-          <span>{isLiveData ? "🟢 LIVE DATA" : "🟡 DEMO MODE"}</span>
+          <span>{
+            isLiveData ? "🟢 LIVE DATA" : isUsingFallback ? "🟠 OFFLINE FALLBACK" : "🟡 DEMO MODE"
+          }</span>
         </div>
 
         <div className="hidden sm:flex items-center space-x-1.5">
@@ -1536,6 +1545,7 @@ const App = () => {
   const [analyticsData, setAnalyticsData] = React.useState(null);
   const [maintenanceData, setMaintenanceData] = React.useState(null);
   const [settingsData, setSettingsData] = React.useState(null);
+  const [isUsingFallback, setIsUsingFallback] = React.useState(false);
 
   const fetchTelemetry = React.useCallback(async () => {
     try {
@@ -1549,6 +1559,8 @@ const App = () => {
         window.ApiService.getAnalytics(selectedMachineId, 60),
         window.ApiService.getMaintenance(selectedMachineId)
       ]);
+
+      setIsUsingFallback(window.ApiService.isUsingFallback);
 
       if (mList && mList.length) setMachines(mList);
       if (mDetail) setCurrentMachine(mDetail);
@@ -1645,7 +1657,7 @@ const App = () => {
         onSelectMachine={setSelectedMachineId}
         onInjectAnomaly={handleInjectAnomaly}
         onClearAnomalies={handleClearAnomalies}
-        isFallback={window.ApiService.isUsingFallback}
+        isUsingFallback={isUsingFallback}
         isLiveData={window.ApiService.isLiveData}
       />
 
