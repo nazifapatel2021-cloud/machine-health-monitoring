@@ -40,9 +40,19 @@ def update_settings(settings: SettingsModel):
 
 @router.post("/inject-anomaly")
 def inject_anomaly(body: AnomalyInjectRequest):
-    """Inject a artificial sensor anomaly for demo presentation purposes."""
-    sensor_provider.inject_anomaly(body.machine_id, body.sensor, body.severity)
-    return {"message": f"Injected {body.severity} anomaly into {body.sensor} for machine {body.machine_id}"}
+    """Inject an artificial sensor anomaly for demo presentation purposes."""
+    m_id = (body.machine_id or "cnc-01").strip()
+    sensor = (body.sensor or "vibration").lower().strip()
+    severity = (body.severity or "critical").lower().strip()
+
+    sensor_provider.inject_anomaly(m_id, sensor, severity)
+    return {
+        "success": True,
+        "message": f"Injected {severity} anomaly into {sensor} for machine {m_id}",
+        "machine_id": m_id,
+        "sensor": sensor,
+        "severity": severity
+    }
 
 @router.post("/clear-anomalies/{machine_id}")
 def clear_anomalies(machine_id: str):

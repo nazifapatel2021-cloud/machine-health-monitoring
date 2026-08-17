@@ -57,7 +57,10 @@ window.ApiService = {
 
   async fetchWithFallback(url, options = {}) {
     try {
-      const res = await fetch(url, { ...options, signal: AbortSignal.timeout(3000) });
+      const res = await fetch(url, {
+        ...options,
+        signal: options.signal || AbortSignal.timeout(15000)
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       window.ApiService.isUsingFallback = false;
@@ -220,30 +223,51 @@ window.ApiService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cfg)
     });
-    return data || { message: "Settings updated locally" };
+    return data || { message: "Settings updated locally (Offline Fallback)", is_fallback: true };
   },
 
-  async injectAnomaly(machineId, sensor, severity = "critical") {
+  async injectAnomaly(machineId, sensor = "vibration", severity = "critical") {
+    const payload = {
+      machine_id: machineId,
+      sensor: sensor || "vibration",
+      severity: severity || "critical"
+    };
     const data = await this.fetchWithFallback(`${API_BASE}/settings/inject-anomaly`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ machine_id: machineId, sensor, severity })
+      body: JSON.stringify(payload)
     });
-    return data || { message: `Injected ${severity} anomaly into ${sensor}` };
+    if (data) return data;
+
+    const m = fallbackState.machines.find(x => x.id === machineId) || fallbackState.machines[0];
+    if (m) {
+      m.condition = severity === "critical" ? "CRITICAL" : "WARNING";
+      m.health_score = severity === "critical" ? 42.0 : 68.0;
+      m.current_readings.vibration = severity === "critical" ? 7.8 : 5.2;
+    }
+    return { message: `Injected ${severity} anomaly into ${sensor} (Offline Fallback)`, is_fallback: true };
   },
 
   async clearAnomalies(machineId) {
     const data = await this.fetchWithFallback(`${API_BASE}/settings/clear-anomalies/${machineId}`, {
       method: "POST"
     });
-    return data || { message: "Cleared anomalies" };
+    if (data) return data;
+
+    const m = fallbackState.machines.find(x => x.id === machineId) || fallbackState.machines[0];
+    if (m) {
+      m.condition = "GOOD";
+      m.health_score = 94.0;
+      m.current_readings = { temperature: 62.4, vibration: 2.3, sound: 48.0, current: 4.8, timestamp: new Date().toLocaleTimeString() };
+    }
+    return { message: "Cleared anomalies (Offline Fallback)", is_fallback: true };
   },
 
   async resolveAlert(alertId) {
     const data = await this.fetchWithFallback(`${API_BASE}/alerts/${alertId}/resolve`, {
       method: "POST"
     });
-    return data || { success: true, alert_id: alertId };
+    return data || { success: true, alert_id: alertId, is_fallback: true };
   }
 };
 

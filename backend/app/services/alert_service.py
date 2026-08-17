@@ -56,8 +56,8 @@ class AlertService:
         ]
         self.alerts.extend(sample_data)
 
-    def process_anomalies(self, machine_id: str, anomalies: List[Dict[str, Any]]) -> None:
-        """Adds new anomaly alerts while preventing spamming (15s throttle per sensor)."""
+    def process_anomalies(self, machine_id: str, anomalies: List[Dict[str, Any]], force_log: bool = False) -> None:
+        """Adds new anomaly alerts while preventing spamming (15s throttle per sensor unless forced)."""
         now = time.time()
         m_name = config.MACHINES.get(machine_id, {}).get("name", machine_id)
 
@@ -65,8 +65,8 @@ class AlertService:
             sensor = anom["sensor"]
             dedup_key = f"{machine_id}_{sensor}"
             
-            # Throttle same anomaly log every 15s
-            if dedup_key in self.last_alert_times:
+            # Throttle same anomaly log every 15s unless forced by explicit user action
+            if not force_log and dedup_key in self.last_alert_times:
                 if (now - self.last_alert_times[dedup_key]) < 15.0:
                     continue
 

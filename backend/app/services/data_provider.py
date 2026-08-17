@@ -213,11 +213,28 @@ class SimulatedSensorDataProvider(SensorDataProvider):
         if machine_id not in self.anomalies:
             self.anomalies[machine_id] = {}
 
+        anomaly_targets = {
+            "temperature": 88.5 if severity == "critical" else 77.5,
+            "vibration": 7.8 if severity == "critical" else 5.2,
+            "sound": 88.0 if severity == "critical" else 74.0,
+            "current": 16.5 if severity == "critical" else 11.2
+        }
+
         if sensor == "all":
             for s in ["temperature", "vibration", "sound", "current"]:
                 self.anomalies[machine_id][s] = {"severity": severity, "time": time.time()}
+                self.current_state[machine_id][s] = anomaly_targets[s]
         else:
             self.anomalies[machine_id][sensor] = {"severity": severity, "time": time.time()}
+            if sensor in anomaly_targets:
+                self.current_state[machine_id][sensor] = anomaly_targets[sensor]
+
+        # Trigger immediate anomaly evaluation and force alert logging
+        from app.services.anomaly_detector import anomaly_detector
+        from app.services.alert_service import alert_service
+        eval_res = anomaly_detector.evaluate_readings(self.get_current_reading(machine_id))
+        if eval_res["anomalies"]:
+            alert_service.process_anomalies(machine_id, eval_res["anomalies"], force_log=True)
 
     def clear_anomalies(self, machine_id: str) -> None:
         if machine_id in self.anomalies:
