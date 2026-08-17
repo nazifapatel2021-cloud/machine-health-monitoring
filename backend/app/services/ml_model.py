@@ -10,39 +10,39 @@ class MachineHealthMLModel:
     """
     def __init__(self):
         self.is_trained = False
-        self.classifier = RandomForestClassifier(n_estimators=50, random_state=42)
-        self.regressor = RandomForestRegressor(n_estimators=50, random_state=42)
+        self.classifier = RandomForestClassifier(n_estimators=15, random_state=42, n_jobs=1)
+        self.regressor = RandomForestRegressor(n_estimators=15, random_state=42, n_jobs=1)
         self._train_synthetic_model()
 
     def _train_synthetic_model(self) -> None:
-        """Generates 1200 synthetic industrial telemetry samples and fits Random Forest models."""
+        """Generates synthetic industrial telemetry samples and fits Random Forest models rapidly."""
         np.random.seed(42)
-        n_samples = 1200
+        n_samples = 300
 
         # Features: [temperature, vibration, sound, current]
-        # Class 0: Normal (800 samples)
-        temp_0 = np.random.normal(62, 5, 800)
-        vib_0 = np.random.normal(2.2, 0.8, 800)
-        snd_0 = np.random.normal(52, 6, 800)
-        curr_0 = np.random.normal(4.8, 1.2, 800)
-        health_0 = np.random.uniform(85, 99, 800)
-        y_class_0 = np.zeros(800, dtype=int)
+        # Class 0: Normal (200 samples)
+        temp_0 = np.random.normal(62, 5, 200)
+        vib_0 = np.random.normal(2.2, 0.8, 200)
+        snd_0 = np.random.normal(52, 6, 200)
+        curr_0 = np.random.normal(4.8, 1.2, 200)
+        health_0 = np.random.uniform(85, 99, 200)
+        y_class_0 = np.zeros(200, dtype=int)
 
-        # Class 1: Warning / Mild Wear (250 samples)
-        temp_1 = np.random.normal(77, 4, 250)
-        vib_1 = np.random.normal(5.2, 0.9, 250)
-        snd_1 = np.random.normal(72, 5, 250)
-        curr_1 = np.random.normal(11.2, 1.8, 250)
-        health_1 = np.random.uniform(55, 78, 250)
-        y_class_1 = np.ones(250, dtype=int)
+        # Class 1: Warning / Mild Wear (60 samples)
+        temp_1 = np.random.normal(77, 4, 60)
+        vib_1 = np.random.normal(5.2, 0.9, 60)
+        snd_1 = np.random.normal(72, 5, 60)
+        curr_1 = np.random.normal(11.2, 1.8, 60)
+        health_1 = np.random.uniform(55, 78, 60)
+        y_class_1 = np.ones(60, dtype=int)
 
-        # Class 2: Critical / Impending Failure (150 samples)
-        temp_2 = np.random.normal(88, 6, 150)
-        vib_2 = np.random.normal(8.1, 1.4, 150)
-        snd_2 = np.random.normal(88, 7, 150)
-        curr_2 = np.random.normal(16.5, 2.5, 150)
-        health_2 = np.random.uniform(15, 48, 150)
-        y_class_2 = np.full(150, 2, dtype=int)
+        # Class 2: Critical / Impending Failure (40 samples)
+        temp_2 = np.random.normal(88, 6, 40)
+        vib_2 = np.random.normal(8.1, 1.4, 40)
+        snd_2 = np.random.normal(88, 7, 40)
+        curr_2 = np.random.normal(16.5, 2.5, 40)
+        health_2 = np.random.uniform(15, 48, 40)
+        y_class_2 = np.full(40, 2, dtype=int)
 
         # Concatenate synthetic dataset
         X = np.column_stack([
