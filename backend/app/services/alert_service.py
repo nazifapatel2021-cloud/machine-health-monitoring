@@ -1,8 +1,7 @@
 import time
 import uuid
 from typing import List, Dict, Any, Optional
-from datetime import datetime
-from app.config import config
+from datetime import datetime, timezone
 
 class AlertService:
     """
@@ -20,7 +19,7 @@ class AlertService:
             {
                 "id": str(uuid.uuid4())[:8],
                 "severity": "WARNING",
-                "timestamp": datetime.fromtimestamp(now - 1200).strftime("%I:%M %p"),
+                "timestamp": datetime.fromtimestamp(now - 1200, tz=timezone.utc).isoformat(),
                 "machine_id": "motor-02",
                 "machine_name": "Motor Unit 02",
                 "sensor": "Temperature",
@@ -32,7 +31,7 @@ class AlertService:
             {
                 "id": str(uuid.uuid4())[:8],
                 "severity": "CRITICAL",
-                "timestamp": datetime.fromtimestamp(now - 3600).strftime("%I:%M %p"),
+                "timestamp": datetime.fromtimestamp(now - 3600, tz=timezone.utc).isoformat(),
                 "machine_id": "cnc-01",
                 "machine_name": "CNC Machine 01",
                 "sensor": "Vibration",
@@ -44,7 +43,7 @@ class AlertService:
             {
                 "id": str(uuid.uuid4())[:8],
                 "severity": "INFO",
-                "timestamp": datetime.fromtimestamp(now - 7200).strftime("%I:%M %p"),
+                "timestamp": datetime.fromtimestamp(now - 7200, tz=timezone.utc).isoformat(),
                 "machine_id": "compressor-03",
                 "machine_name": "Compressor 03",
                 "sensor": "System",
@@ -74,7 +73,7 @@ class AlertService:
             alert_item = {
                 "id": str(uuid.uuid4())[:8],
                 "severity": anom["severity"],
-                "timestamp": datetime.now().strftime("%I:%M %p"),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "machine_id": machine_id,
                 "machine_name": m_name,
                 "sensor": sensor.capitalize(),

@@ -1,3 +1,14 @@
+const formatAlertTime = (ts) => {
+  if (!ts) return "";
+  try {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    }
+  } catch (e) {}
+  return ts;
+};
+
 const AlertsPage = ({ alerts, onResolveAlert }) => {
   const [filterSeverity, setFilterSeverity] = React.useState("all");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -82,7 +93,7 @@ const AlertsPage = ({ alerts, onResolveAlert }) => {
                           <span>• Sensor: <strong className="text-slate-200">{alt.sensor}</strong></span>
                           <span>• Value: <strong className="text-slate-200">{alt.value}</strong></span>
                           <span>• Threshold: <strong className="text-slate-200">{alt.threshold}</strong></span>
-                          <span>• Time: {alt.timestamp}</span>
+                          <span>• Time: {formatAlertTime(alt.timestamp)}</span>
                         </div>
                       </div>
                     </div>
