@@ -70,6 +70,17 @@ window.ApiService = {
     }
   },
 
+  async getUnifiedTelemetry(machineId) {
+    const data = await this.fetchWithFallback(`${API_BASE}/telemetry/${machineId}`);
+    if (data) {
+      window.ApiService.isUsingFallback = false;
+      window.ApiService.isLiveData = !!(data.sensors && data.sensors.is_live);
+      return data;
+    }
+    window.ApiService.isUsingFallback = true;
+    return null;
+  },
+
   async getMachines() {
     const data = await this.fetchWithFallback(`${API_BASE}/machines`);
     if (data) {

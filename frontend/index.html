@@ -192,6 +192,17 @@
         }
       },
 
+      async getUnifiedTelemetry(machineId) {
+        const data = await this.fetchWithFallback(`${API_BASE}/telemetry/${machineId}`);
+        if (data) {
+          window.ApiService.isUsingFallback = false;
+          window.ApiService.isLiveData = !!(data.sensors && data.sensors.is_live);
+          return data;
+        }
+        window.ApiService.isUsingFallback = true;
+        return null;
+      },
+
       async getMachines() {
         const data = await this.fetchWithFallback(`${API_BASE}/machines`);
         if (data) {
@@ -1694,27 +1705,38 @@
 
       const fetchTelemetry = React.useCallback(async () => {
         try {
-          const [mList, mDetail, sData, hData, pData, aData, chartData, maintData] = await Promise.all([
-            window.ApiService.getMachines(),
-            window.ApiService.getMachine(selectedMachineId),
-            window.ApiService.getSensors(selectedMachineId),
-            window.ApiService.getHealth(selectedMachineId),
-            window.ApiService.getPrediction(selectedMachineId),
-            window.ApiService.getAlerts(selectedMachineId),
-            window.ApiService.getAnalytics(selectedMachineId, 60),
-            window.ApiService.getMaintenance(selectedMachineId)
-          ]);
-
-          setIsUsingFallback(window.ApiService.isUsingFallback);
-
-          if (mList && mList.length) setMachines(mList);
-          if (mDetail) setCurrentMachine(mDetail);
-          if (sData) setSensorsData(sData);
-          if (hData) setHealthData(hData);
-          if (pData) setPredictionData(pData);
-          if (aData) setAlertsData(aData);
-          if (chartData) setAnalyticsData(chartData);
-          if (maintData) setMaintenanceData(maintData);
+          const telemetry = await window.ApiService.getUnifiedTelemetry(selectedMachineId);
+          if (telemetry) {
+            setIsUsingFallback(false);
+            if (telemetry.machines && telemetry.machines.length) setMachines(telemetry.machines);
+            if (telemetry.current_machine) setCurrentMachine(telemetry.current_machine);
+            if (telemetry.sensors) setSensorsData(telemetry.sensors);
+            if (telemetry.health) setHealthData(telemetry.health);
+            if (telemetry.prediction) setPredictionData(telemetry.prediction);
+            if (telemetry.alerts) setAlertsData(telemetry.alerts);
+            if (telemetry.analytics) setAnalyticsData(telemetry.analytics);
+            if (telemetry.maintenance) setMaintenanceData(telemetry.maintenance);
+          } else {
+            setIsUsingFallback(window.ApiService.isUsingFallback);
+            const [mList, mDetail, sData, hData, pData, aData, chartData, maintData] = await Promise.all([
+              window.ApiService.getMachines(),
+              window.ApiService.getMachine(selectedMachineId),
+              window.ApiService.getSensors(selectedMachineId),
+              window.ApiService.getHealth(selectedMachineId),
+              window.ApiService.getPrediction(selectedMachineId),
+              window.ApiService.getAlerts(selectedMachineId),
+              window.ApiService.getAnalytics(selectedMachineId, 60),
+              window.ApiService.getMaintenance(selectedMachineId)
+            ]);
+            if (mList && mList.length) setMachines(mList);
+            if (mDetail) setCurrentMachine(mDetail);
+            if (sData) setSensorsData(sData);
+            if (hData) setHealthData(hData);
+            if (pData) setPredictionData(pData);
+            if (aData) setAlertsData(aData);
+            if (chartData) setAnalyticsData(chartData);
+            if (maintData) setMaintenanceData(maintData);
+          }
         } catch (err) {
           console.error("Telemetry fetch error:", err);
         }
