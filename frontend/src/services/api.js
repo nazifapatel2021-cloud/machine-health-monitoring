@@ -59,7 +59,7 @@ window.ApiService = {
     try {
       const res = await fetch(url, {
         ...options,
-        signal: options.signal || AbortSignal.timeout(15000)
+        signal: options.signal || AbortSignal.timeout(25000)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
