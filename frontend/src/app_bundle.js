@@ -78,6 +78,41 @@ window.ApiService = {
       window.ApiService.isLiveData = !!(data.sensors && data.sensors.is_live);
       return data;
     }
+
+    // Graceful fallback if /telemetry/ endpoint is 404/building: try individual endpoints
+    try {
+      const [mList, sData, hData, pData, aList, anData, maintData] = await Promise.all([
+        this.fetchWithFallback(`${API_BASE}/machines`),
+        this.fetchWithFallback(`${API_BASE}/sensors/${machineId}`),
+        this.fetchWithFallback(`${API_BASE}/health/${machineId}`),
+        this.fetchWithFallback(`${API_BASE}/prediction/${machineId}`),
+        this.fetchWithFallback(`${API_BASE}/alerts`),
+        this.fetchWithFallback(`${API_BASE}/analytics/${machineId}`),
+        this.fetchWithFallback(`${API_BASE}/maintenance/${machineId}`)
+      ]);
+
+      if (mList && sData) {
+        window.ApiService.isUsingFallback = false;
+        window.ApiService.isLiveData = !!sData.is_live;
+        const mDetail = mList.find(m => m.id === machineId) || mList[0];
+        return {
+          machines: mList,
+          current_machine: {
+            ...mDetail,
+            sensor_status_matrix: sData.evaluations || {}
+          },
+          sensors: sData,
+          health: hData || { health_score: 90, condition: 'GOOD' },
+          prediction: pData || {},
+          alerts: aList || [],
+          analytics: anData || { count: 0, history: [] },
+          maintenance: maintData || { recommendations: [], count: 0 }
+        };
+      }
+    } catch (fallbackErr) {
+      console.warn("[Backend Offline]: Individual API endpoints also failed.", fallbackErr);
+    }
+
     window.ApiService.isUsingFallback = true;
     return null;
   },
