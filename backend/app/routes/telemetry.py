@@ -23,24 +23,29 @@ def get_unified_telemetry(machine_id: str):
     m_detail = config.MACHINES.get(machine_id, list(config.MACHINES.values())[0])
     readings = sensor_provider.get_current_reading(machine_id)
     eval_res = anomaly_detector.evaluate_readings(readings)
-    h_score = anomaly_detector.calculate_health_score(eval_res["evaluations"])
     p_data = ml_model.predict(
         readings["temperature"],
         readings["vibration"],
         readings["sound"],
         readings["current"]
     )
+    h_score = p_data.get("health_score", 90.0)
     alerts_list = alert_service.get_alerts(machine_id=machine_id)
     history_data = sensor_provider.get_history(machine_id, limit=60)
+    
+    sensor_matrix = eval_res.get("sensor_statuses", {})
+    overall_cond = eval_res.get("condition", "GOOD")
+    vib_stat = sensor_matrix.get("vibration", {}).get("status", "NORMAL")
+    
     maint_recs = [
         {
             "id": f"maint-{machine_id}",
             "machine_id": machine_id,
             "machine_name": m_detail["name"],
-            "sensor": "Vibration" if eval_res["evaluations"]["vibration"]["status"] != "NORMAL" else "Temperature",
-            "finding": f"Condition evaluated as {eval_res['overall_condition']}.",
-            "recommendation": p_data["recommended_action"],
-            "priority": "High" if eval_res["overall_condition"] == "CRITICAL" else "Medium" if eval_res["overall_condition"] == "WARNING" else "Low",
+            "sensor": "Vibration" if vib_stat != "NORMAL" else "Temperature",
+            "finding": f"Condition evaluated as {overall_cond}.",
+            "recommendation": p_data.get("recommended_action", "Continue normal operation."),
+            "priority": "High" if overall_cond == "CRITICAL" else "Medium" if overall_cond == "WARNING" else "Low",
             "timestamp": datetime.now().strftime("%Y-%m-%d"),
             "disclaimer": "AI recommendation — verify with engineering team."
         }
@@ -51,20 +56,20 @@ def get_unified_telemetry(machine_id: str):
         "current_machine": {
             "id": machine_id,
             **m_detail,
-            "sensor_status_matrix": eval_res["evaluations"]
+            "sensor_status_matrix": sensor_matrix
         },
         "sensors": {
             "machine_id": machine_id,
             "readings": readings,
-            "is_live": sensor_provider.is_live(machine_id),
-            "evaluations": eval_res["evaluations"],
-            "condition": eval_res["overall_condition"],
-            "anomalies": eval_res["anomalies"]
+            "is_live": sensor_provider.is_live_data(machine_id),
+            "evaluations": sensor_matrix,
+            "condition": overall_cond,
+            "anomalies": eval_res.get("anomalies", [])
         },
         "health": {
             "machine_id": machine_id,
             "health_score": h_score,
-            "condition": eval_res["overall_condition"]
+            "condition": overall_cond
         },
         "prediction": {
             "machine_id": machine_id,
