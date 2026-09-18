@@ -3,7 +3,7 @@ import time
 import math
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.config import config
 
 class SensorDataProvider(ABC):
@@ -122,7 +122,7 @@ class SimulatedSensorDataProvider(SensorDataProvider):
     def update_tick(self) -> None:
         """Called every simulation tick. Updates simulated values if no real data is live."""
         now_ts = time.time()
-        dt_str = datetime.fromtimestamp(now_ts).strftime("%H:%M:%S")
+        dt_str = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat()
 
         for m_id, m_info in config.MACHINES.items():
             # If real hardware telemetry is currently live (<15s ago), skip simulated tick
@@ -186,7 +186,7 @@ class SimulatedSensorDataProvider(SensorDataProvider):
             machine_id = "cnc-01"
 
         now_ts = time.time()
-        dt_str = datetime.fromtimestamp(now_ts).strftime("%H:%M:%S")
+        dt_str = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat()
         st = self.current_state[machine_id]
         is_live = self.is_live_data(machine_id)
 

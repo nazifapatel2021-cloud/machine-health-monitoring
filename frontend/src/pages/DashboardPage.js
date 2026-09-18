@@ -1,3 +1,14 @@
+const formatAlertTime = (ts) => {
+  if (!ts) return "";
+  try {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    }
+  } catch (e) {}
+  return ts;
+};
+
 const DashboardPage = ({ machine, health, sensors, prediction, alerts, onInjectAnomaly, onNavigate }) => {
   if (!machine || !sensors) {
     return <div className="p-8 text-center text-slate-400">Loading machine telemetry...</div>;
@@ -181,7 +192,7 @@ const DashboardPage = ({ machine, health, sensors, prediction, alerts, onInjectA
                   <div>
                     <span className="text-xs font-semibold text-white block">{alt.message}</span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {alt.machine_name} • Sensor: {alt.sensor} • {alt.timestamp}
+                      {alt.machine_name} • Sensor: {alt.sensor} • {formatAlertTime(alt.timestamp)}
                     </span>
                   </div>
                 </div>

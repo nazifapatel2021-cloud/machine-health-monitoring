@@ -778,7 +778,7 @@ const DashboardPage = ({ machine, health, sensors, prediction, alerts, onInjectA
                   <div>
                     <span className="text-xs font-semibold text-white block">{alt.message}</span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {alt.machine_name} • Sensor: {alt.sensor} • {alt.timestamp}
+                      {alt.machine_name} • Sensor: {alt.sensor} • {formatAlertTime(alt.timestamp)}
                     </span>
                   </div>
                 </div>
