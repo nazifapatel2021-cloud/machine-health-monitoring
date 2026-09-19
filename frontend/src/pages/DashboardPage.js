@@ -160,26 +160,29 @@ const DashboardPage = ({ machine, health, sensors, prediction, alerts, onInjectA
       </div>
 
       {/* Recent Alerts Feed */}
-      <div className="glass-card rounded-2xl p-6 border border-slate-800">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
-            <span>🚨 Recent Anomaly Alerts</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-              {alerts.length} Total
-            </span>
-          </h3>
-          <button onClick={() => onNavigate("alerts")} className="text-xs text-cyan-400 hover:underline">
-            View All Alert Logs →
-          </button>
-        </div>
+      {(() => {
+        const machineAlerts = alerts.filter(a => !machine || a.machine_id === machine.id);
+        return (
+          <div className="glass-card rounded-2xl p-6 border border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                <span>🚨 Recent Anomaly Alerts</span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                  {machineAlerts.length} Total
+                </span>
+              </h3>
+              <button onClick={() => onNavigate("alerts")} className="text-xs text-cyan-400 hover:underline">
+                View All Alert Logs →
+              </button>
+            </div>
 
-        {alerts.length === 0 ? (
-          <div className="p-4 text-center text-xs text-slate-500 font-mono">
-            No active anomaly alerts detected. Machine operating within normal parameters.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {alerts.slice(0, 3).map((alt) => (
+            {machineAlerts.length === 0 ? (
+              <div className="p-4 text-center text-xs text-slate-500 font-mono">
+                No active anomaly alerts detected for this machine. Operating within normal parameters.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {machineAlerts.slice(0, 3).map((alt) => (
               <div key={alt.id} className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <span className={`px-2 py-1 rounded text-[10px] font-bold font-mono ${
@@ -200,8 +203,8 @@ const DashboardPage = ({ machine, health, sensors, prediction, alerts, onInjectA
               </div>
             ))}
           </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 };

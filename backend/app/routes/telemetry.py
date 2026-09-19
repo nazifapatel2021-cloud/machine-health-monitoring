@@ -30,7 +30,7 @@ def get_unified_telemetry(machine_id: str):
         readings["current"]
     )
     h_score = p_data.get("health_score", 90.0)
-    alerts_list = alert_service.get_alerts(machine_id=machine_id)
+    alerts_list = alert_service.get_alerts()
     history_data = sensor_provider.get_history(machine_id, limit=60)
     
     sensor_matrix = eval_res.get("sensor_statuses", {})
