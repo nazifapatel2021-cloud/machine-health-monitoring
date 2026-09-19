@@ -2,6 +2,7 @@ import time
 import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from app.config import config
 
 class AlertService:
     """
