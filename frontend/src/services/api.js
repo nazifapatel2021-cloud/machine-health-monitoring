@@ -8,6 +8,8 @@ const API_BASE = window.ENV_API_BASE || (
 
 // Fallback client-side simulated state if backend server is unreachable
 const fallbackState = {
+  alerts: [],
+  localAnomalies: {},
   machines: [
     {
       id: "cnc-01",
@@ -75,6 +77,25 @@ window.ApiService = {
     if (data) {
       window.ApiService.isUsingFallback = false;
       window.ApiService.isLiveData = !!(data.sensors && data.sensors.is_live);
+      const localIds = new Set(fallbackState.alerts.map(alert => alert.id));
+      data.alerts = [...fallbackState.alerts, ...(data.alerts || []).filter(alert => !localIds.has(alert.id))];
+      const localAnomaly = fallbackState.localAnomalies[machineId];
+      if (localAnomaly && data.sensors && data.health) {
+        data.sensors.readings = { ...data.sensors.readings, ...localAnomaly.readings };
+        data.sensors.condition = localAnomaly.condition;
+        data.health.condition = localAnomaly.condition;
+        data.health.health_score = localAnomaly.health_score;
+        if (data.prediction) {
+          data.prediction.health_score = localAnomaly.health_score;
+          data.prediction.failure_probability = 100 - localAnomaly.health_score;
+          data.prediction.risk_level = localAnomaly.condition;
+        }
+        if (data.current_machine) {
+          data.current_machine.condition = localAnomaly.condition;
+          data.current_machine.health_score = localAnomaly.health_score;
+          data.current_machine.current_readings = data.sensors.readings;
+        }
+      }
       return data;
     }
 
@@ -94,6 +115,23 @@ window.ApiService = {
         window.ApiService.isUsingFallback = false;
         window.ApiService.isLiveData = !!sData.is_live;
         const mDetail = mList.find(m => m.id === machineId) || mList[0];
+        const localAnomaly = fallbackState.localAnomalies[machineId];
+        if (localAnomaly) {
+          sData.readings = { ...sData.readings, ...localAnomaly.readings };
+          sData.condition = localAnomaly.condition;
+          if (hData) {
+            hData.condition = localAnomaly.condition;
+            hData.health_score = localAnomaly.health_score;
+          }
+          mDetail.condition = localAnomaly.condition;
+          mDetail.health_score = localAnomaly.health_score;
+          mDetail.current_readings = sData.readings;
+          if (pData) {
+            pData.health_score = localAnomaly.health_score;
+            pData.failure_probability = 100 - localAnomaly.health_score;
+            pData.risk_level = localAnomaly.condition;
+          }
+        }
         return {
           machines: mList,
           current_machine: {
@@ -103,7 +141,7 @@ window.ApiService = {
           sensors: sData,
           health: hData || { health_score: 90, condition: 'GOOD' },
           prediction: pData || {},
-          alerts: aList || [],
+          alerts: [...fallbackState.alerts, ...(aList || []).filter(alert => !fallbackState.alerts.some(local => local.id === alert.id))],
           analytics: anData || { count: 0, history: [] },
           maintenance: maintData || { recommendations: [], count: 0 }
         };
@@ -195,21 +233,12 @@ window.ApiService = {
     const qStr = query.length ? `?${query.join("&")}` : "";
 
     const data = await this.fetchWithFallback(`${API_BASE}/alerts${qStr}`);
-    if (data) return data;
-    return [
-      {
-        id: "alt-01",
-        severity: "WARNING",
-        timestamp: "10:35 AM",
-        machine_id: "motor-02",
-        machine_name: "Motor Unit 02",
-        sensor: "Temperature",
-        message: "Temperature approaching warning threshold (74.2 °C)",
-        status: "RESOLVED",
-        value: 74.2,
-        threshold: 75.0
-      }
-    ];
+    const alerts = data || [];
+    const localIds = new Set(fallbackState.alerts.map(alert => alert.id));
+    return [...fallbackState.alerts, ...alerts.filter(alert => !localIds.has(alert.id))].filter(alert =>
+      (!machineId || machineId === "all" || alert.machine_id === machineId) &&
+      (!severity || severity === "all" || alert.severity.toLowerCase() === severity.toLowerCase())
+    );
   },
 
   async getAnalytics(machineId, limit = 60) {
@@ -286,13 +315,43 @@ window.ApiService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    if (data) return data;
+    if (data && data.success !== false) return data;
 
     const m = fallbackState.machines.find(x => x.id === machineId) || fallbackState.machines[0];
     if (m) {
+      const limitsBySensor = {
+        temperature: { warning: 75, critical: 85, unit: "°C" },
+        vibration: { warning: 4.5, critical: 7, unit: "mm/s" },
+        sound: { warning: 70, critical: 85, unit: "dB" },
+        current: { warning: 10, critical: 15, unit: "A" }
+      };
+      const sensorKeys = payload.sensor === "all" ? Object.keys(limitsBySensor) : [payload.sensor];
+      for (const key of sensorKeys) {
+        const limits = limitsBySensor[key];
+        if (!limits) continue;
+        const threshold = payload.severity === "critical" ? limits.critical : limits.warning;
+        const value = threshold + (payload.severity === "critical" ? 0.8 : 0.7);
+        m.current_readings[key] = value;
+        fallbackState.alerts.unshift({
+          id: `demo-${Date.now()}-${key}`,
+          severity: payload.severity.toUpperCase(),
+          timestamp: new Date().toISOString(),
+          machine_id: m.id,
+          machine_name: m.name,
+          sensor: key[0].toUpperCase() + key.slice(1),
+          message: `${payload.severity === "critical" ? "Critical threshold exceeded" : "Warning threshold reached"} for ${key} (${value} ${limits.unit} >= ${threshold} ${limits.unit})`,
+          status: "ACTIVE",
+          value,
+          threshold
+        });
+      }
       m.condition = severity === "critical" ? "CRITICAL" : "WARNING";
       m.health_score = severity === "critical" ? 42.0 : 68.0;
-      m.current_readings.vibration = severity === "critical" ? 7.8 : 5.2;
+      fallbackState.localAnomalies[m.id] = {
+        condition: m.condition,
+        health_score: m.health_score,
+        readings: { ...m.current_readings }
+      };
     }
     return { message: `Injected ${severity} anomaly into ${sensor} (Offline Fallback)`, is_fallback: true };
   },
@@ -301,6 +360,10 @@ window.ApiService = {
     const data = await this.fetchWithFallback(`${API_BASE}/settings/clear-anomalies/${machineId}`, {
       method: "POST"
     });
+    fallbackState.alerts.forEach(alert => {
+      if (alert.machine_id === machineId && alert.status === "ACTIVE") alert.status = "RESOLVED";
+    });
+    delete fallbackState.localAnomalies[machineId];
     if (data) return data;
 
     const m = fallbackState.machines.find(x => x.id === machineId) || fallbackState.machines[0];
@@ -316,7 +379,10 @@ window.ApiService = {
     const data = await this.fetchWithFallback(`${API_BASE}/alerts/${alertId}/resolve`, {
       method: "POST"
     });
-    return data || { success: true, alert_id: alertId, is_fallback: true };
+    const alert = fallbackState.alerts.find(item => item.id === alertId);
+    if (data && (data.success || !alert)) return data;
+    if (alert) alert.status = "RESOLVED";
+    return { success: !!alert, alert_id: alertId, is_fallback: true };
   }
 };
 

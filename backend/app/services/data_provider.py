@@ -230,35 +230,37 @@ class SimulatedSensorDataProvider(SensorDataProvider):
         return self.history[m_id][-limit:]
 
     def inject_anomaly(self, machine_id: str, sensor: str, severity: str = "critical") -> None:
-        try:
-            m_id = resolve_machine_id(machine_id) or "cnc-01"
-            if m_id not in self.anomalies:
-                self.anomalies[m_id] = {}
+        m_id = resolve_machine_id(machine_id)
+        if not m_id:
+            raise ValueError(f"Unknown machine: {machine_id}")
+        if sensor not in {"temperature", "vibration", "sound", "current", "all"}:
+            raise ValueError(f"Unknown sensor: {sensor}")
+        if severity not in {"warning", "critical"}:
+            raise ValueError(f"Unknown severity: {severity}")
+        if m_id not in self.anomalies:
+            self.anomalies[m_id] = {}
 
-            anomaly_targets = {
-                "temperature": 88.5 if severity == "critical" else 77.5,
-                "vibration": 7.8 if severity == "critical" else 5.2,
-                "sound": 88.0 if severity == "critical" else 74.0,
-                "current": 16.5 if severity == "critical" else 11.2
-            }
+        anomaly_targets = {
+            "temperature": 88.5 if severity == "critical" else 77.5,
+            "vibration": 7.8 if severity == "critical" else 5.2,
+            "sound": 88.0 if severity == "critical" else 74.0,
+            "current": 16.5 if severity == "critical" else 11.2
+        }
 
-            if sensor == "all":
-                for s in ["temperature", "vibration", "sound", "current"]:
-                    self.anomalies[m_id][s] = {"severity": severity, "time": time.time()}
-                    self.current_state[m_id][s] = anomaly_targets[s]
-            else:
-                self.anomalies[m_id][sensor] = {"severity": severity, "time": time.time()}
-                if sensor in anomaly_targets:
-                    self.current_state[m_id][sensor] = anomaly_targets[sensor]
+        if sensor == "all":
+            for s in ["temperature", "vibration", "sound", "current"]:
+                self.anomalies[m_id][s] = {"severity": severity, "time": time.time()}
+                self.current_state[m_id][s] = anomaly_targets[s]
+        else:
+            self.anomalies[m_id][sensor] = {"severity": severity, "time": time.time()}
+            self.current_state[m_id][sensor] = anomaly_targets[sensor]
 
-            # Trigger immediate anomaly evaluation and force alert logging
-            from app.services.anomaly_detector import anomaly_detector
-            from app.services.alert_service import alert_service
-            eval_res = anomaly_detector.evaluate_readings(self.get_current_reading(m_id))
-            if eval_res.get("anomalies"):
-                alert_service.process_anomalies(m_id, eval_res["anomalies"], force_log=True)
-        except Exception as e:
-            print(f"[Inject Anomaly Sensor Error]: {e}")
+        # Trigger immediate anomaly evaluation and force alert logging
+        from app.services.anomaly_detector import anomaly_detector
+        from app.services.alert_service import alert_service
+        eval_res = anomaly_detector.evaluate_readings(self.get_current_reading(m_id))
+        if eval_res.get("anomalies"):
+            alert_service.process_anomalies(m_id, eval_res["anomalies"], force_log=True)
 
     def clear_anomalies(self, machine_id: str) -> None:
         m_id = resolve_machine_id(machine_id) or "cnc-01"

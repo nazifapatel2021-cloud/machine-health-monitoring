@@ -11,50 +11,6 @@ class AlertService:
     def __init__(self):
         self.alerts: List[Dict[str, Any]] = []
         self.last_alert_times: Dict[str, float] = {} # De-duplication map
-        self._seed_sample_alerts()
-
-    def _seed_sample_alerts(self) -> None:
-        """Seed initial alert timeline with realistic history."""
-        now = time.time()
-        sample_data = [
-            {
-                "id": str(uuid.uuid4())[:8],
-                "severity": "WARNING",
-                "timestamp": datetime.fromtimestamp(now - 1200, tz=timezone.utc).isoformat(),
-                "machine_id": "motor-02",
-                "machine_name": "Motor Unit 02",
-                "sensor": "Temperature",
-                "message": "Temperature elevated above normal operating range (76.4 °C)",
-                "status": "RESOLVED",
-                "value": 76.4,
-                "threshold": 75.0
-            },
-            {
-                "id": str(uuid.uuid4())[:8],
-                "severity": "CRITICAL",
-                "timestamp": datetime.fromtimestamp(now - 3600, tz=timezone.utc).isoformat(),
-                "machine_id": "cnc-01",
-                "machine_name": "CNC Machine 01",
-                "sensor": "Vibration",
-                "message": "Excessive spindle vibration detected during high-speed pass (7.4 mm/s)",
-                "status": "RESOLVED",
-                "value": 7.4,
-                "threshold": 7.0
-            },
-            {
-                "id": str(uuid.uuid4())[:8],
-                "severity": "INFO",
-                "timestamp": datetime.fromtimestamp(now - 7200, tz=timezone.utc).isoformat(),
-                "machine_id": "compressor-03",
-                "machine_name": "Compressor 03",
-                "sensor": "System",
-                "message": "Scheduled routine pressure test completed successfully",
-                "status": "RESOLVED",
-                "value": 0.0,
-                "threshold": 0.0
-            }
-        ]
-        self.alerts.extend(sample_data)
 
     def process_anomalies(self, machine_id: str, anomalies: List[Dict[str, Any]], force_log: bool = False) -> None:
         """Adds new anomaly alerts while preventing spamming (15s throttle per sensor unless forced)."""
