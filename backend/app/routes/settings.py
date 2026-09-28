@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from typing import Optional
 from app.config import config
 from app.models.schemas import SettingsModel, AnomalyInjectRequest
 from app.services.data_provider import sensor_provider, resolve_machine_id
@@ -42,38 +43,47 @@ def update_settings(settings: SettingsModel):
     return {"message": "Settings updated successfully", "settings": settings}
 
 @router.post("/inject-anomaly")
-def inject_anomaly(body: AnomalyInjectRequest):
+def inject_anomaly(body: Optional[AnomalyInjectRequest] = None):
     """Inject an artificial sensor anomaly for demo presentation purposes."""
-    raw_machine_id = (body.machine_id or "cnc-01").strip()
-    m_id = resolve_machine_id(raw_machine_id)
-    if not m_id:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Machine '{raw_machine_id}' not found. Valid machines: {list(config.MACHINES.keys())}"
-        )
+    try:
+        if body is None:
+            body = AnomalyInjectRequest()
+        raw_machine_id = (body.machine_id or "cnc-01").strip()
+        m_id = resolve_machine_id(raw_machine_id)
+        if not m_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Machine '{raw_machine_id}' not found. Valid machines: {list(config.MACHINES.keys())}"
+            )
 
-    sensor = (body.sensor or "vibration").lower().strip()
-    if sensor not in VALID_SENSORS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid sensor '{body.sensor}'. Valid sensors: {sorted(list(VALID_SENSORS))}"
-        )
+        sensor = (body.sensor or "vibration").lower().strip()
+        if sensor not in VALID_SENSORS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid sensor '{body.sensor}'. Valid sensors: {sorted(list(VALID_SENSORS))}"
+            )
 
-    severity = (body.severity or "critical").lower().strip()
-    if severity not in VALID_SEVERITIES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid severity '{body.severity}'. Valid severities: {sorted(list(VALID_SEVERITIES))}"
-        )
+        severity = (body.severity or "critical").lower().strip()
+        if severity not in VALID_SEVERITIES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid severity '{body.severity}'. Valid severities: {sorted(list(VALID_SEVERITIES))}"
+            )
 
-    sensor_provider.inject_anomaly(m_id, sensor, severity)
-    return {
-        "success": True,
-        "message": f"Injected {severity} anomaly into {sensor} for machine {m_id}",
-        "machine_id": m_id,
-        "sensor": sensor,
-        "severity": severity
-    }
+        sensor_provider.inject_anomaly(m_id, sensor, severity)
+        return {
+            "success": True,
+            "message": f"Injected {severity} anomaly into {sensor} for machine {m_id}",
+            "machine_id": m_id,
+            "sensor": sensor,
+            "severity": severity
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error in inject_anomaly: {str(e)}")
 
 @router.post("/clear-anomalies/{machine_id}")
 def clear_anomalies(machine_id: str):
