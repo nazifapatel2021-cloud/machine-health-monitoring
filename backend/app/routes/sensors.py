@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, HTTPException
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
-from app.services.data_provider import sensor_provider
+from app.services.data_provider import sensor_provider, resolve_machine_id
 from app.services.anomaly_detector import anomaly_detector
+from app.config import config
 
 router = APIRouter(prefix="/sensors", tags=["sensors"])
 
@@ -15,12 +16,18 @@ class HardwareIngestPayload(BaseModel):
 @router.get("/{machine_id}")
 def get_sensor_readings(machine_id: str):
     """Get live sensor readings, live vs demo fallback state, and threshold status for a machine."""
-    readings = sensor_provider.get_current_reading(machine_id)
+    m_id = resolve_machine_id(machine_id)
+    if not m_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Machine '{machine_id}' not found. Valid machines: {list(config.MACHINES.keys())}"
+        )
+    readings = sensor_provider.get_current_reading(m_id)
     eval_res = anomaly_detector.evaluate_readings(readings)
-    is_live = sensor_provider.is_live_data(machine_id)
+    is_live = sensor_provider.is_live_data(m_id)
     
     return {
-        "machine_id": machine_id,
+        "machine_id": m_id,
         "readings": readings,
         "is_live": is_live,
         "evaluations": eval_res["sensor_statuses"],
@@ -34,10 +41,17 @@ def ingest_hardware_sensor_data(machine_id: str, payload: HardwareIngestPayload)
     Endpoint for hardware devices (ESP32) to POST real sensor readings.
     Updates the machine state and sets the LIVE DATA window for 15 seconds.
     """
-    res = sensor_provider.ingest_real_reading(machine_id, payload.model_dump())
+    m_id = resolve_machine_id(machine_id)
+    if not m_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Machine '{machine_id}' not found. Valid machines: {list(config.MACHINES.keys())}"
+        )
+    res = sensor_provider.ingest_real_reading(m_id, payload.model_dump())
     return {
         "status": "success",
-        "message": f"Real sensor data ingested for machine '{machine_id}'",
+        "message": f"Real sensor data ingested for machine '{m_id}'",
         "is_live": True,
         "reading": res
     }
+

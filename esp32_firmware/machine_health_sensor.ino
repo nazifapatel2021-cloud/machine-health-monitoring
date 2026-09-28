@@ -20,14 +20,15 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
 
 // =======================================================================================
 //  STEP 1: CONFIGURATION — EDIT THESE 3 LINES ONLY!
 // =======================================================================================
 const char* WIFI_SSID     = "YOUR_WIFI_NAME_HERE";       // Replace with your 2.4GHz Wi-Fi Name
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD_HERE";   // Replace with your Wi-Fi Password
-const char* SERVER_URL    = "YOUR_BACKEND_URL_HERE/api/sensors/1/ingest";
-// ^ Replace YOUR_BACKEND_URL_HERE with your local IP address or public deployment URL
+const char* SERVER_URL    = "https://machine-health-monitoring.onrender.com/api/sensors/cnc-01/ingest";
+// ^ Replace with your backend endpoint URL (e.g. http://192.168.1.50:8000/api/sensors/cnc-01/ingest or Render production URL)
 
 // Telemetry transmit interval in milliseconds (3000ms = 3 seconds)
 const unsigned long TRANSMIT_INTERVAL_MS = 3000;
@@ -47,6 +48,9 @@ const int PIN_VIBRATION_SW  = 34;  // Vibration Module Pin
 const int PIN_SOUND_ANALOG  = 35;  // Sound Sensor Analog Pin
 const int PIN_CURRENT_ACS   = 32;  // Current Sensor Analog Pin
 
+#define DHTTYPE DHT22
+DHT dht(PIN_TEMP_DHT22, DHTTYPE);
+
 // Helper simulation variables for fallback when physical sensors are unattached
 float simTemp = 62.4;
 float simVib = 2.3;
@@ -64,6 +68,9 @@ void setup() {
   Serial.println("\n-------------------------------------------------------------");
   Serial.println("   ESP32 Industrial Telemetry Sensor Node Booting...");
   Serial.println("-------------------------------------------------------------");
+
+  // Initialize DHT22 temperature sensor
+  dht.begin();
 
   // Configure hardware pin modes
   pinMode(PIN_VIBRATION_SW, INPUT);
@@ -135,7 +142,11 @@ void connectToWiFi() {
 //  SENSOR READ FUNCTIONS — WITH AUTOMATIC FALLBACK FOR UNWIRED SENSORS
 // =======================================================================================
 float readTemperature() {
-  // If DHT22 sensor is wired, read value here.
+  // Try reading physical DHT22 sensor
+  float t = dht.readTemperature();
+  if (!isnan(t) && t > 0.0) {
+    return t;
+  }
   // Fallback: generates baseline 62.4 °C with small random physical thermal noise.
   simTemp += (random(-5, 6) / 10.0);
   if (simTemp < 55.0) simTemp = 58.0;

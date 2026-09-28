@@ -1,9 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.config import config
 from app.models.schemas import SettingsModel, AnomalyInjectRequest
-from app.services.data_provider import sensor_provider
+from app.services.data_provider import sensor_provider, resolve_machine_id
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+VALID_SENSORS = {"temperature", "vibration", "sound", "current", "all"}
+VALID_SEVERITIES = {"warning", "critical"}
 
 @router.get("", response_model=SettingsModel)
 def get_settings():
@@ -41,9 +44,27 @@ def update_settings(settings: SettingsModel):
 @router.post("/inject-anomaly")
 def inject_anomaly(body: AnomalyInjectRequest):
     """Inject an artificial sensor anomaly for demo presentation purposes."""
-    m_id = (body.machine_id or "cnc-01").strip()
+    raw_machine_id = (body.machine_id or "cnc-01").strip()
+    m_id = resolve_machine_id(raw_machine_id)
+    if not m_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Machine '{raw_machine_id}' not found. Valid machines: {list(config.MACHINES.keys())}"
+        )
+
     sensor = (body.sensor or "vibration").lower().strip()
+    if sensor not in VALID_SENSORS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sensor '{body.sensor}'. Valid sensors: {sorted(list(VALID_SENSORS))}"
+        )
+
     severity = (body.severity or "critical").lower().strip()
+    if severity not in VALID_SEVERITIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid severity '{body.severity}'. Valid severities: {sorted(list(VALID_SEVERITIES))}"
+        )
 
     sensor_provider.inject_anomaly(m_id, sensor, severity)
     return {
@@ -57,5 +78,12 @@ def inject_anomaly(body: AnomalyInjectRequest):
 @router.post("/clear-anomalies/{machine_id}")
 def clear_anomalies(machine_id: str):
     """Reset machine anomalies back to healthy baseline."""
-    sensor_provider.clear_anomalies(machine_id)
-    return {"message": f"Cleared all anomalies for machine {machine_id}"}
+    m_id = resolve_machine_id(machine_id)
+    if not m_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Machine '{machine_id}' not found. Valid machines: {list(config.MACHINES.keys())}"
+        )
+    sensor_provider.clear_anomalies(m_id)
+    return {"message": f"Cleared all anomalies for machine {m_id}"}
+

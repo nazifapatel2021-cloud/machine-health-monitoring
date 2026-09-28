@@ -31,9 +31,31 @@ class SensorDataProvider(ABC):
     def ingest_real_reading(self, machine_id: str, reading_data: Dict[str, float]) -> Dict[str, Any]:
         pass
 
-    @abstractmethod
-    def is_live_data(self, machine_id: str) -> bool:
-        pass
+MACHINE_ALIASES = {
+    "1": "cnc-01",
+    "01": "cnc-01",
+    "cnc1": "cnc-01",
+    "cnc-1": "cnc-01",
+    "2": "motor-02",
+    "02": "motor-02",
+    "motor2": "motor-02",
+    "motor-2": "motor-02",
+    "3": "compressor-03",
+    "03": "compressor-03",
+    "compressor3": "compressor-03",
+    "compressor-3": "compressor-03",
+}
+
+def resolve_machine_id(machine_id: str) -> Optional[str]:
+    """Resolves machine ID or alias to canonical ID, or returns None if invalid."""
+    if not machine_id:
+        return None
+    m_clean = str(machine_id).strip().lower()
+    if m_clean in config.MACHINES:
+        return m_clean
+    if m_clean in MACHINE_ALIASES:
+        return MACHINE_ALIASES[m_clean]
+    return None
 
 class SimulatedSensorDataProvider(SensorDataProvider):
     """
@@ -180,15 +202,16 @@ class SimulatedSensorDataProvider(SensorDataProvider):
                 self.history[m_id].pop(0)
 
     def get_current_reading(self, machine_id: str) -> Dict[str, Any]:
-        if machine_id not in self.current_state and machine_id in ["1", "01"]:
-            machine_id = "cnc-01"
-        if machine_id not in self.current_state:
-            machine_id = "cnc-01"
+        m_id = resolve_machine_id(machine_id) or "cnc-01"
 
         now_ts = time.time()
         dt_str = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat()
-        st = self.current_state[machine_id]
-        is_live = self.is_live_data(machine_id)
+        if m_id not in self.current_state:
+            baseline = config.MACHINES.get("cnc-01", {}).get("baseline", {"temperature": 62.4, "vibration": 2.3, "sound": 48.0, "current": 4.8})
+            self.current_state[m_id] = baseline.copy()
+
+        st = self.current_state[m_id]
+        is_live = self.is_live_data(m_id)
 
         return {
             "temperature": st["temperature"],
@@ -197,51 +220,53 @@ class SimulatedSensorDataProvider(SensorDataProvider):
             "current": st["current"],
             "timestamp": dt_str,
             "is_live": is_live,
-            "last_seen_sec_ago": round(now_ts - self.last_real_data_timestamp.get(machine_id, 0.0), 1)
+            "last_seen_sec_ago": round(now_ts - self.last_real_data_timestamp.get(m_id, 0.0), 1)
         }
 
     def get_history(self, machine_id: str, limit: int = 60) -> List[Dict[str, Any]]:
-        if machine_id not in self.history and machine_id in ["1", "01"]:
-            machine_id = "cnc-01"
-        if machine_id not in self.history:
-            machine_id = "cnc-01"
-        return self.history[machine_id][-limit:]
+        m_id = resolve_machine_id(machine_id) or "cnc-01"
+        if m_id not in self.history:
+            return []
+        return self.history[m_id][-limit:]
 
     def inject_anomaly(self, machine_id: str, sensor: str, severity: str = "critical") -> None:
-        if machine_id not in self.anomalies and machine_id in ["1", "01"]:
-            machine_id = "cnc-01"
-        if machine_id not in self.anomalies:
-            self.anomalies[machine_id] = {}
+        try:
+            m_id = resolve_machine_id(machine_id) or "cnc-01"
+            if m_id not in self.anomalies:
+                self.anomalies[m_id] = {}
 
-        anomaly_targets = {
-            "temperature": 88.5 if severity == "critical" else 77.5,
-            "vibration": 7.8 if severity == "critical" else 5.2,
-            "sound": 88.0 if severity == "critical" else 74.0,
-            "current": 16.5 if severity == "critical" else 11.2
-        }
+            anomaly_targets = {
+                "temperature": 88.5 if severity == "critical" else 77.5,
+                "vibration": 7.8 if severity == "critical" else 5.2,
+                "sound": 88.0 if severity == "critical" else 74.0,
+                "current": 16.5 if severity == "critical" else 11.2
+            }
 
-        if sensor == "all":
-            for s in ["temperature", "vibration", "sound", "current"]:
-                self.anomalies[machine_id][s] = {"severity": severity, "time": time.time()}
-                self.current_state[machine_id][s] = anomaly_targets[s]
-        else:
-            self.anomalies[machine_id][sensor] = {"severity": severity, "time": time.time()}
-            if sensor in anomaly_targets:
-                self.current_state[machine_id][sensor] = anomaly_targets[sensor]
+            if sensor == "all":
+                for s in ["temperature", "vibration", "sound", "current"]:
+                    self.anomalies[m_id][s] = {"severity": severity, "time": time.time()}
+                    self.current_state[m_id][s] = anomaly_targets[s]
+            else:
+                self.anomalies[m_id][sensor] = {"severity": severity, "time": time.time()}
+                if sensor in anomaly_targets:
+                    self.current_state[m_id][sensor] = anomaly_targets[sensor]
 
-        # Trigger immediate anomaly evaluation and force alert logging
-        from app.services.anomaly_detector import anomaly_detector
-        from app.services.alert_service import alert_service
-        eval_res = anomaly_detector.evaluate_readings(self.get_current_reading(machine_id))
-        if eval_res["anomalies"]:
-            alert_service.process_anomalies(machine_id, eval_res["anomalies"], force_log=True)
+            # Trigger immediate anomaly evaluation and force alert logging
+            from app.services.anomaly_detector import anomaly_detector
+            from app.services.alert_service import alert_service
+            eval_res = anomaly_detector.evaluate_readings(self.get_current_reading(m_id))
+            if eval_res.get("anomalies"):
+                alert_service.process_anomalies(m_id, eval_res["anomalies"], force_log=True)
+        except Exception as e:
+            print(f"[Inject Anomaly Sensor Error]: {e}")
 
     def clear_anomalies(self, machine_id: str) -> None:
-        if machine_id in self.anomalies:
-            self.anomalies[machine_id].clear()
-            m_info = config.MACHINES.get(machine_id)
+        m_id = resolve_machine_id(machine_id) or "cnc-01"
+        if m_id in self.anomalies:
+            self.anomalies[m_id].clear()
+            m_info = config.MACHINES.get(m_id)
             if m_info:
-                self.current_state[machine_id] = m_info["baseline"].copy()
+                self.current_state[m_id] = m_info["baseline"].copy()
 
 # Global Provider Instance
 sensor_provider = SimulatedSensorDataProvider()

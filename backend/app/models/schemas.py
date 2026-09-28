@@ -67,6 +67,6 @@ class SettingsModel(BaseModel):
     demo_mode: bool
 
 class AnomalyInjectRequest(BaseModel):
-    machine_id: str
-    sensor: str  # "temperature", "vibration", "sound", "current", "all"
-    severity: str = "critical"  # "warning", "critical"
+    machine_id: Optional[str] = "cnc-01"
+    sensor: Optional[str] = "vibration"
+    severity: Optional[str] = "critical"
