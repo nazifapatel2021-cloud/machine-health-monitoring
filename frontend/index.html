@@ -442,22 +442,19 @@
 
         const m = fallbackState.machines.find(x => x.id === machineId) || fallbackState.machines[0];
         if (m) {
-          const sensorKey = payload.sensor;
-          const thresholds = {
+          const limitsBySensor = {
             temperature: { warning: 75, critical: 85, unit: "°C" },
             vibration: { warning: 4.5, critical: 7, unit: "mm/s" },
             sound: { warning: 70, critical: 85, unit: "dB" },
             current: { warning: 10, critical: 15, unit: "A" }
           };
-          const sensors = sensorKey === "all" ? Object.keys(thresholds) : [sensorKey];
-          for (const key of sensors) {
-            const limits = thresholds[key];
+          const sensorKeys = payload.sensor === "all" ? Object.keys(limitsBySensor) : [payload.sensor];
+          for (const key of sensorKeys) {
+            const limits = limitsBySensor[key];
             if (!limits) continue;
-            const value = payload.severity === "critical" ? limits.critical + 0.8 : limits.warning + 0.7;
-            if (key === "temperature") m.current_readings.temperature = value;
-            else if (key === "vibration") m.current_readings.vibration = value;
-            else if (key === "sound") m.current_readings.sound = value;
-            else if (key === "current") m.current_readings.current = value;
+            const threshold = payload.severity === "critical" ? limits.critical : limits.warning;
+            const value = threshold + (payload.severity === "critical" ? 0.8 : 0.7);
+            m.current_readings[key] = value;
             fallbackState.alerts.unshift({
               id: `demo-${Date.now()}-${key}`,
               severity: payload.severity.toUpperCase(),
@@ -465,10 +462,10 @@
               machine_id: m.id,
               machine_name: m.name,
               sensor: key[0].toUpperCase() + key.slice(1),
-              message: `${payload.severity === "critical" ? "Critical threshold exceeded" : "Warning threshold reached"} for ${key} (${value} ${limits.unit} >= ${payload.severity === "critical" ? limits.critical : limits.warning} ${limits.unit})`,
+              message: `${payload.severity === "critical" ? "Critical threshold exceeded" : "Warning threshold reached"} for ${key} (${value} ${limits.unit} >= ${threshold} ${limits.unit})`,
               status: "ACTIVE",
               value,
-              threshold: payload.severity === "critical" ? limits.critical : limits.warning
+              threshold
             });
           }
           m.condition = severity === "critical" ? "CRITICAL" : "WARNING";
