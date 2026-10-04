@@ -45,14 +45,28 @@ const AnalyticsPage = ({ machineId, analyticsData }) => {
       ctx.fillText(val.toFixed(1), 10, y + 4);
     }
 
-    // Draw X Axis Labels (timestamps)
+    // Draw X Axis Labels (timestamps formatted cleanly)
     const stepX = graphW / (values.length - 1 || 1);
     const labelStep = Math.max(1, Math.floor(values.length / 5));
 
     for (let i = 0; i < values.length; i += labelStep) {
       const x = pLeft + i * stepX;
-      const ts = history[i].timestamp || "";
-      ctx.fillText(ts, x - 15, height - 10);
+      let ts = history[i].timestamp || "";
+      if (ts) {
+        try {
+          const d = new Date(ts);
+          if (!isNaN(d.getTime())) {
+            ts = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+          } else if (typeof ts === 'string' && ts.includes("T")) {
+            ts = ts.split("T")[1].split(".")[0];
+          }
+        } catch (e) {
+          if (typeof ts === 'string' && ts.includes("T")) {
+            ts = ts.split("T")[1].split(".")[0];
+          }
+        }
+      }
+      ctx.fillText(ts, x - 20, height - 10);
     }
 
     // Colors per metric
